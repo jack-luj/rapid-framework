@@ -16,7 +16,7 @@ public class Main {
 	// write your code here
 
         GeneratorFacade g = new GeneratorFacade();
-        g.deleteOutRootDir();
+        // g.deleteOutRootDir();无需删除旧文件  直接覆盖
         //删除生成器的输出目录//
         g.generateByAllTable("template");
     }
