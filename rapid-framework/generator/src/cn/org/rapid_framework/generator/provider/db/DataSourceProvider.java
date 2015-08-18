@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
@@ -57,7 +58,10 @@ public class DataSourceProvider {
 		private String username;
 		private String password;
 		private String driverClass;
-		
+
+		public Logger getParentLogger(){
+			return  null ;
+		}
 		private static void loadJdbcDriver(String driver) {
 			try {
 				Class.forName(driver);
