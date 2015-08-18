@@ -14,7 +14,7 @@ public class Main {
      */
     public static void main(String[] args) throws Exception{
 	// write your code here
-        System.out.println("AAAAAAA");
+
         GeneratorFacade g = new GeneratorFacade();
         g.deleteOutRootDir();
         //删除生成器的输出目录//
