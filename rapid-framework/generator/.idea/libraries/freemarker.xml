@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="freemarker1">
+  <library name="freemarker">
     <CLASSES>
       <root url="jar://$PROJECT_DIR$/lib/freemarker.jar!/" />
       <root url="jar://$PROJECT_DIR$/lib/mysql-connector-java-5.0.5-bin.jar!/" />
