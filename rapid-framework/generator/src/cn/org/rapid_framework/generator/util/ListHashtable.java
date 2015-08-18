@@ -15,7 +15,8 @@ import java.util.List;
  *
  */
 public class ListHashtable extends Hashtable {
-	protected List orderedKeys = new ArrayList();
+	public String welcome="Welcome FreeMarker!";
+	public List orderedKeys = new ArrayList();
 	public synchronized void clear() {
 		super.clear();
 		orderedKeys = new ArrayList();
@@ -176,4 +177,5 @@ public class ListHashtable extends Hashtable {
 	public Object getOrderedValue(int i) {
 		return get(getOrderedKey(i));
 	}
+
 }

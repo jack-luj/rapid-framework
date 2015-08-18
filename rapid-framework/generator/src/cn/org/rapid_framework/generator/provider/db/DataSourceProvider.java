@@ -8,7 +8,6 @@ import java.util.logging.Logger;
 
 import javax.sql.DataSource;
 
-import cn.org.rapid_framework.generator.GeneratorConstants;
 import cn.org.rapid_framework.generator.GeneratorProperties;
 /**
  * 用于提供生成器的数据源
@@ -20,14 +19,6 @@ public class DataSourceProvider {
 	private static Connection connection;
 	private static DataSource dataSource;
 
-	public synchronized static Connection getNewConnection() {
-		try {
-			return getDataSource().getConnection();
-		}catch(SQLException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
 	public synchronized static Connection getConnection() {
 		try {
 			if(connection == null || connection.isClosed()) {
@@ -45,10 +36,10 @@ public class DataSourceProvider {
 
 	public synchronized static DataSource getDataSource() {
 		if(dataSource == null) {
-			dataSource = new DriverManagerDataSource(GeneratorProperties.getRequiredProperty(GeneratorConstants.JDBC_URL), 
-					GeneratorProperties.getRequiredProperty(GeneratorConstants.JDBC_USERNAME), 
-					GeneratorProperties.getProperty(GeneratorConstants.JDBC_PASSWORD), 
-					GeneratorProperties.getRequiredProperty(GeneratorConstants.JDBC_DRIVER));
+			dataSource = new DriverManagerDataSource(GeneratorProperties.getRequiredProperty("jdbc.url"), 
+					GeneratorProperties.getRequiredProperty("jdbc.username"), 
+					GeneratorProperties.getProperty("jdbc.password"), 
+					GeneratorProperties.getRequiredProperty("jdbc.driver"));
 		}
 		return dataSource;
 	}
@@ -58,7 +49,6 @@ public class DataSourceProvider {
 		private String username;
 		private String password;
 		private String driverClass;
-
 		public Logger getParentLogger(){
 			return  null ;
 		}

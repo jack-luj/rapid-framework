@@ -39,18 +39,18 @@ import freemarker.template.TemplateException;
  * @author badqiu
  * @email badqiu(a)gmail.com
  */
-public class Generator implements GeneratorConstants {
+public class Generator {
 	private static final String GENERATOR_INSERT_LOCATION = "generator-insert-location";
 	private List templateRootDirs = new ArrayList();
 	private String outRootDir;
 	private boolean ignoreTemplateGenerateException = true;
-	private String removeExtensions = GeneratorProperties.getProperty(GENERATOR_REMOVE_EXTENSIONS,".ftl,.vm");
+	private String removeExtensions = System.getProperty("generator.removeExtensions",".ftl,.vm");
 	private boolean isCopyBinaryFile = true;
 	
-	private String includes = GeneratorProperties.getProperty(GENERATOR_INCLUDES); // 需要处理的模板，使用逗号分隔符,示例值: java_src/**,java_test/**
-	private String excludes = GeneratorProperties.getProperty(GENERATOR_EXCLUDES); // 不需要处理的模板，使用逗号分隔符,示例值: java_src/**,java_test/**
-	private String sourceEncoding =  GeneratorProperties.getProperty(GENERATOR_SOURCE_ENCODING,"UTF-8");
-	private String outputEncoding =  GeneratorProperties.getProperty(GENERATOR_OUTPUT_ENCODING,"UTF-8");
+	private String includes = System.getProperty("generator.includes"); // 需要处理的模板，使用逗号分隔符,示例值: java_src/**,java_test/**
+	private String excludes = System.getProperty("generator.excludes"); // 不需要处理的模板，使用逗号分隔符,示例值: java_src/**,java_test/**
+	private String sourceEncoding =  System.getProperty("generator.sourceEncoding","UTF-8");
+	private String outputEncoding =  System.getProperty("generator.outputEncoding","UTF-8");
 	
 	public Generator() {
 	}
@@ -109,9 +109,9 @@ public class Generator implements GeneratorConstants {
 		this.excludes = excludes;
 	}
 
-	public void setOutRootDir(String rootDir) {
-		if(rootDir == null) throw new IllegalArgumentException("outRootDir must be not null");
-		this.outRootDir = rootDir;
+	public void setOutRootDir(String v) {
+		if(v == null) throw new IllegalArgumentException("outRootDir must be not null");
+		this.outRootDir = v;
 	}
 	
 	public String getOutRootDir() {
@@ -193,6 +193,7 @@ public class Generator implements GeneratorConstants {
 	
 	private class TemplateProcessor {
 		private GeneratorControl gg = new GeneratorControl();
+
 		private void executeGenerate(File templateRootDir,Map templateModel, Map filePathModel ,File srcFile) throws SQLException, IOException,TemplateException {
 			String templateFile = FileHelper.getRelativePath(templateRootDir, srcFile);
 			if(GeneratorHelper.isIgnoreTemplateProcess(srcFile, templateFile,includes,excludes)) {
@@ -308,7 +309,7 @@ public class Generator implements GeneratorConstants {
 				return;
 			}
 			
-			GLogger.println("[generate]\t template:"+templateFile+" ==> "+outputFilepath);
+			GLogger.println("[generate]\t template:" + templateFile + " ==> " + outputFilepath);
 			FreemarkerHelper.processTemplate(template, templateModel, absoluteOutputFilePath,gg.getOutputEncoding());
 		}
 	}

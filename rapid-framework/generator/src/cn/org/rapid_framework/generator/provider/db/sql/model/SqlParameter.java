@@ -3,7 +3,6 @@ package cn.org.rapid_framework.generator.provider.db.sql.model;
 import cn.org.rapid_framework.generator.provider.db.table.model.Column;
 import cn.org.rapid_framework.generator.util.BeanHelper;
 import cn.org.rapid_framework.generator.util.StringHelper;
-import cn.org.rapid_framework.generator.util.typemapping.JavaPrimitiveTypeMapping;
 
 public class SqlParameter extends Column {
     	String parameterClass;
@@ -68,7 +67,7 @@ public class SqlParameter extends Column {
 				if(parameterClassName.indexOf("Set") >= 0){
 					return parameterClassName;
 				}
-				return "java.util.List<"+JavaPrimitiveTypeMapping.getWrapperType(parameterClassName)+">";
+				return "java.util.List<"+parameterClassName+">";
 			}else {
 				return parameterClassName;
 			}

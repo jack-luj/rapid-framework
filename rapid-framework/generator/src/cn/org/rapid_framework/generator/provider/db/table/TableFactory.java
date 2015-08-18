@@ -4,6 +4,7 @@ package cn.org.rapid_framework.generator.provider.db.table;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -16,13 +17,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import cn.org.rapid_framework.generator.GeneratorConstants;
 import cn.org.rapid_framework.generator.GeneratorProperties;
 import cn.org.rapid_framework.generator.provider.db.DataSourceProvider;
 import cn.org.rapid_framework.generator.provider.db.table.model.Column;
 import cn.org.rapid_framework.generator.provider.db.table.model.Table;
 import cn.org.rapid_framework.generator.util.BeanHelper;
-import cn.org.rapid_framework.generator.util.DBHelper;
 import cn.org.rapid_framework.generator.util.FileHelper;
 import cn.org.rapid_framework.generator.util.GLogger;
 import cn.org.rapid_framework.generator.util.StringHelper;
@@ -53,11 +52,11 @@ public class TableFactory {
 	}
 	
 	public String getCatalog() {
-		return GeneratorProperties.getNullIfBlank(GeneratorConstants.JDBC_CATALOG);
+		return GeneratorProperties.getNullIfBlank("jdbc.catalog");
 	}
 
 	public String getSchema() {
-		return GeneratorProperties.getNullIfBlank(GeneratorConstants.JDBC_SCHEMA);
+		return GeneratorProperties.getNullIfBlank("jdbc.schema");
 	}
 
 	private Connection getConnection() {
@@ -72,7 +71,16 @@ public class TableFactory {
 			throw new RuntimeException(e);
 		}
 	}
-	
+
+	//从配置文件获取忽略的表名
+	public static List<String> getIgnoreTableNames() {
+		List<String> ignoreTableNames=new ArrayList<String>();
+		String tablenames = GeneratorProperties.getProperty("tableIgnore", "");
+		for(String tname : tablenames.split(",")) {
+			ignoreTableNames.add(tname);
+		}
+		return ignoreTableNames;
+	}
 	public Table getTable(String tableName) {
 		return getTable(getSchema(),tableName);
 	}
@@ -116,77 +124,65 @@ public class TableFactory {
 		Connection conn = getConnection();
 		DatabaseMetaData dbMetaData = conn.getMetaData();
 		ResultSet rs = dbMetaData.getTables(catalog, schema, tableName, null);
-		try {
-			while(rs.next()) {
-				Table table = createTable(schema,catalog,conn, rs);
-				return table;
-			}
-		}finally {
-			DBHelper.close(rs);
+		while(rs.next()) {
+			Table table = createTable(conn, rs);
+			return table;
 		}
 		return null;
 	}
 
-	private Table createTable(String schema,String catalog,Connection conn, ResultSet rs) throws SQLException {
-		String tableName = null;
+	private Table createTable(Connection conn, ResultSet rs) throws SQLException {
+		String realTableName = null;
 		try {
 			ResultSetMetaData rsMetaData = rs.getMetaData();
 			String schemaName = rs.getString("TABLE_SCHEM") == null ? "" : rs.getString("TABLE_SCHEM");
-			tableName = rs.getString("TABLE_NAME");
+			realTableName = rs.getString("TABLE_NAME");
 			String tableType = rs.getString("TABLE_TYPE");
 			String remarks = rs.getString("REMARKS");
 			if(remarks == null && dbHelper.isOracleDataBase()) {
-				remarks = getOracleTableComments(tableName);
+				remarks = getOracleTableComments(realTableName);
 			}
 			
 			Table table = new Table();
-			table.setSchema(schema);
-			table.setCatalog(catalog);
-			table.setSqlName(tableName);
+			table.setSqlName(realTableName);
 			table.setRemarks(remarks);
 			
 			if ("SYNONYM".equals(tableType) && dbHelper.isOracleDataBase()) {
-			    String[] ownerAndTableName = getSynonymOwnerAndTableName(tableName);
-				table.setOwnerSynonymName(ownerAndTableName[0]);
-				table.setTableSynonymName(ownerAndTableName[1]);
+			    table.setOwnerSynonymName(getSynonymOwner(realTableName));
 			}
 			
 			retriveTableColumns(table);
+			
 			table.initExportedKeys(conn.getMetaData());
 			table.initImportedKeys(conn.getMetaData());
 			BeanHelper.copyProperties(table, TableOverrideValuesProvider.getTableOverrideValues(table.getSqlName()));
 			return table;
 		}catch(SQLException e) {
-			throw new RuntimeException("create table object error,tableName:"+tableName,e);
+			throw new RuntimeException("create table object error,tableName:"+realTableName,e);
 		}
 	}
 	
 	private List getAllTables(Connection conn) throws SQLException {
 		DatabaseMetaData dbMetaData = conn.getMetaData();
 		ResultSet rs = dbMetaData.getTables(getCatalog(), getSchema(), null, null);
-		try {
-			List tables = new ArrayList();
-			while(rs.next()) {
-				tables.add(createTable(getSchema(),getCatalog(),conn, rs));
-			}
-			return tables;
-		}finally {
-			DBHelper.close(rs);
+		List tables = new ArrayList();
+		while(rs.next()) {
+			tables.add(createTable(conn, rs));
 		}
+		return tables;
 	}
 
-	private String[] getSynonymOwnerAndTableName(String synonymName)  {
+	private String getSynonymOwner(String synonymName)  {
 	      PreparedStatement ps = null;
 	      ResultSet rs = null;
-	      String[] ret = new String[2];
+	      String ret = null;
 	      try {
-			 ps = getConnection().prepareStatement("select table_owner,table_name from sys.all_synonyms where synonym_name=? and owner=?");
+	         ps = getConnection().prepareStatement("select table_owner from sys.all_synonyms where table_name=? and owner=?");
 	         ps.setString(1, synonymName);
 	         ps.setString(2, getSchema());
 	         rs = ps.executeQuery();
 	         if (rs.next()) {
-	            ret[0] = rs.getString(1);
-	            ret[1] = rs.getString(2);
+	            ret = rs.getString(1);
 	         }
 	         else {
 	            String databaseStructure = getDatabaseStructureInfo();
@@ -197,7 +193,7 @@ public class TableFactory {
 	         GLogger.error(e.getMessage(), e);
 	         throw new RuntimeException("Exception in getting synonym owner " + databaseStructure);
 	      } finally {
-	         DBHelper.close(null,ps,rs);
+	         dbHelper.close(rs,ps);
 	      }
 	      return ret;
 	   }
@@ -222,7 +218,7 @@ public class TableFactory {
 	         GLogger.warn("Couldn't get schemas", e2);
 	         sb.append("  ?? Couldn't get schemas ??").append(nl);
 	      } finally {
-	         DBHelper.close(schemaRs);
+	         dbHelper.close(schemaRs,null);
 	      }
 
 	      try {
@@ -235,7 +231,7 @@ public class TableFactory {
 	         GLogger.warn("Couldn't get catalogs", e2);
 	         sb.append("  ?? Couldn't get catalogs ??").append(nl);
 	      } finally {
-	         DBHelper.close(catalogRs);
+	         dbHelper.close(catalogRs,null);
 	      }
 	      return sb.toString();
     }
@@ -261,7 +257,7 @@ public class TableFactory {
 	      try {
 
 	         if (table.getOwnerSynonymName() != null) {
-	            indexRs = getMetaData().getIndexInfo(getCatalog(), table.getOwnerSynonymName(), table.getTableSynonymName(), false, true);
+	            indexRs = getMetaData().getIndexInfo(getCatalog(), table.getOwnerSynonymName(), table.getSqlName(), false, true);
 	         }
 	         else {
 	            indexRs = getMetaData().getIndexInfo(getCatalog(), getSchema(), table.getSqlName(), false, true);
@@ -292,7 +288,7 @@ public class TableFactory {
 	         // Bug #604761 Oracle getIndexInfo() needs major grants
 	         // http://sourceforge.net/tracker/index.php?func=detail&aid=604761&group_id=36044&atid=415990
 	      } finally {
-	         DBHelper.close(indexRs);
+	         dbHelper.close(indexRs,null);
 	      }
 
 	      List columns = getTableColumns(table, primaryKeys, indices, uniqueIndices, uniqueColumns);
@@ -312,7 +308,7 @@ public class TableFactory {
 		// get the columns
 	      List columns = new LinkedList();
 	      ResultSet columnRs = getColumnsResultSet(table);
-	      try {
+	      
 	      while (columnRs.next()) {
 	         int sqlType = columnRs.getInt("DATA_TYPE");
 	         String sqlTypeName = columnRs.getString("TYPE_NAME");
@@ -357,16 +353,14 @@ public class TableFactory {
 	         BeanHelper.copyProperties(column,TableOverrideValuesProvider.getColumnOverrideValues(table,column));
 	         columns.add(column);
 	    }
-		} finally {
-			DBHelper.close(columnRs);
-		}
+	    columnRs.close();
 		return columns;
 	}
 	
 	private ResultSet getColumnsResultSet(Table table) throws SQLException {
 		ResultSet columnRs = null;
 	    if (table.getOwnerSynonymName() != null) {
-	         columnRs = getMetaData().getColumns(getCatalog(), table.getOwnerSynonymName(), table.getTableSynonymName(), null);
+	         columnRs = getMetaData().getColumns(getCatalog(), table.getOwnerSynonymName(), table.getSqlName(), null);
 	    } else {
 	         columnRs = getMetaData().getColumns(getCatalog(), getSchema(), table.getSqlName(), null);
 	    }
@@ -377,9 +371,8 @@ public class TableFactory {
 		// get the primary keys
 	      List primaryKeys = new LinkedList();
 	      ResultSet primaryKeyRs = null;
-	      try {
 	      if (table.getOwnerSynonymName() != null) {
-	         primaryKeyRs = getMetaData().getPrimaryKeys(getCatalog(), table.getOwnerSynonymName(), table.getTableSynonymName());
+	         primaryKeyRs = getMetaData().getPrimaryKeys(getCatalog(), table.getOwnerSynonymName(), table.getSqlName());
 	      }
 	      else {
 	         primaryKeyRs = getMetaData().getPrimaryKeys(getCatalog(), getSchema(), table.getSqlName());
@@ -389,10 +382,8 @@ public class TableFactory {
 	         GLogger.trace("primary key:" + columnName);
 	         primaryKeys.add(columnName);
 	      }
-	      }finally {
-	    	  DBHelper.close(primaryKeyRs);
-	      }
-		  return primaryKeys;
+	      primaryKeyRs.close();
+		return primaryKeys;
 	}
 
 	private String getOracleTableComments(String table)  {
@@ -454,7 +445,14 @@ public class TableFactory {
 	}
 	
 	class DbHelper {
-
+		public void close(ResultSet rs,PreparedStatement ps,Statement... statements) {
+			try {
+				if(ps != null) ps.close();
+				if(rs != null) rs.close();
+				for(Statement s : statements) {s.close();}
+			}catch(Exception e){
+			}
+		}
 		public boolean isOracleDataBase() {
 			try {
 				return DatabaseMetaDataUtils.isOracleDataBase(getMetaData());
@@ -477,7 +475,7 @@ public class TableFactory {
 				e.printStackTrace();
 				return null;
 			}finally {
-				DBHelper.close(null,s,rs);
+				close(rs,null,s);
 			}
 		}		
 	}

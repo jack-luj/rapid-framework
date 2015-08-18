@@ -5,9 +5,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,7 +22,6 @@ import cn.org.rapid_framework.generator.provider.db.table.TableFactory.NotFoundT
 import cn.org.rapid_framework.generator.provider.db.table.model.Column;
 import cn.org.rapid_framework.generator.provider.db.table.model.Table;
 import cn.org.rapid_framework.generator.util.BeanHelper;
-import cn.org.rapid_framework.generator.util.DBHelper;
 import cn.org.rapid_framework.generator.util.GLogger;
 import cn.org.rapid_framework.generator.util.StringHelper;
 import cn.org.rapid_framework.generator.util.sqlparse.BasicSqlFormatter;
@@ -44,9 +45,15 @@ import cn.org.rapid_framework.generator.util.typemapping.JdbcType;
  */
 public class SqlFactory {
     
+    private List<SqlParameter> customParameters = new ArrayList<SqlParameter>();
+    
     public SqlFactory() {
     }
     
+	public SqlFactory(List<SqlParameter> customParameters) {
+        this.customParameters = customParameters;
+    }
+
     public Sql parseSql(String sourceSql) {
     	if(StringHelper.isBlank(sourceSql)) throw new IllegalArgumentException("sourceSql must be not empty");
     	String beforeProcessedSql = beforeParseSql(sourceSql);
@@ -65,13 +72,12 @@ public class SqlFactory {
         GLogger.debug("executeSql :"+sql.getExecuteSql());
         GLogger.debug("*********************************");
         
-        Connection conn = null;
+        Connection conn = DataSourceProvider.getConnection();
         try {
-        	conn = DataSourceProvider.getNewConnection();
-        	conn.setAutoCommit(false);
         	if(!DatabaseMetaDataUtils.isHsqlDataBase(conn.getMetaData())){
         		conn.setReadOnly(true);
         	}
+        	conn.setAutoCommit(false);
 	        PreparedStatement ps = conn.prepareStatement(SqlParseHelper.removeOrders(executeSql));
 	        ResultSetMetaData resultSetMetaData = executeForResultSetMetaData(executeSql,ps);
             sql.setColumns(new SelectColumnsParser().convert2Columns(sql,resultSetMetaData));
@@ -84,11 +90,10 @@ public class SqlFactory {
         	throw new RuntimeException("sql parse error,\nexecutedSql:"+SqlParseHelper.removeOrders(executeSql),e);
         }finally {
         	try {
-	        	if(conn != null) conn.rollback();
+	        	conn.rollback();
+	        	conn.close();
         	}catch(Exception e) {
         		throw new RuntimeException(e);
-        	}finally {
-        		DBHelper.close(conn);
         	}
         }
     }
@@ -106,9 +111,8 @@ public class SqlFactory {
 		ps.setMaxRows(3);
         ps.setFetchSize(3);
         ps.setQueryTimeout(20);
-        ResultSet rs = null;
         try {
-			rs = ps.executeQuery();
+			ResultSet rs = ps.executeQuery();
 			return rs.getMetaData(); 
 		} catch (SQLException e) {
 			try {
@@ -116,8 +120,6 @@ public class SqlFactory {
 			}catch(SQLException ee) {
 				throw e;
 			}
-		}finally {
-			DBHelper.close(rs);
 		}
 	}
 	
@@ -236,13 +238,15 @@ public class SqlFactory {
 		}
 	
 		private Column findColumnByParamName(ParsedSql parsedSql,Sql sql, String paramName) throws Exception {
+		    for(SqlParameter customParam : customParameters) {
+		        if(customParam.getParamName().equals(paramName)) {
+		            return customParam;
+		        }
+		    }
 			Column column = sql.getColumnByName(paramName);
 			if(column == null) {
 				//FIXME 还未处理 t.username = :username的t前缀问题
-				String leftColumn = SqlParseHelper.getColumnNameByRightCondition(parsedSql.toString(), paramName);
-				if(leftColumn != null) {
-					column = findColumnByParseSql(parsedSql, leftColumn );
-				}
+				column = findColumnByParseSql(parsedSql, SqlParseHelper.getColumnNameByRightCondition(parsedSql.toString(), paramName) );
 			}
 			if(column == null) {
 				column = findColumnByParseSql(parsedSql, paramName);
@@ -251,8 +255,6 @@ public class SqlFactory {
 		}
 	
 		private Column findColumnByParseSql(ParsedSql sql, String paramName) throws Exception {
-			if(paramName == null) throw new NullPointerException("'paramName' must be not null");
-			
 			Collection<NameWithAlias> tableNames = SqlParseHelper.getTableNamesByQuery(sql.toString());
 			for(NameWithAlias tableName : tableNames) {
 				Table t = TableFactory.getInstance().getTable(tableName.getName());

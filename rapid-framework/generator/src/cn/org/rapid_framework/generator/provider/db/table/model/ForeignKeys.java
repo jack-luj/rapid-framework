@@ -6,6 +6,10 @@ package cn.org.rapid_framework.generator.provider.db.table.model;
 
 import cn.org.rapid_framework.generator.util.ListHashtable;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 /**
  * @author Richard
  * This class contains a list of all the tables for which foreign keys
@@ -15,8 +19,8 @@ import cn.org.rapid_framework.generator.util.ListHashtable;
  */
 public class ForeignKeys  implements java.io.Serializable{
 	
-	protected Table parentTable;  //宿主表
-	protected ListHashtable associatedTables;
+	public Table parentTable;  //宿主表
+	public ListHashtable associatedTables;
 	/**
 	 * Constructor for Foreign Keys
 	 */
@@ -48,7 +52,7 @@ public class ForeignKeys  implements java.io.Serializable{
 	 * @return Returns the associatedTables.
 	 */
 	public ListHashtable getAssociatedTables() {
-		return associatedTables;
+			return associatedTables;
 	}
 	public int getSize() {
 		return getAssociatedTables().size();
@@ -100,5 +104,17 @@ public class ForeignKeys  implements java.io.Serializable{
 			}
 		}
 		return aKey;
+	}
+	public List<Table> listMapToList(){
+		List<Table> tables=new ArrayList<Table>();
+		Table t ;
+		for(Iterator it   =   associatedTables.keySet().iterator();   it.hasNext();   )   {
+			String   tableName   =   (String)it.next();
+			t=new Table();
+			t.setSqlName(tableName);
+			tables.add(t);
+			//放进tables中
+		 		}
+		return tables;
 	}
 }

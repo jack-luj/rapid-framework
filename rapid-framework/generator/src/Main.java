@@ -1,5 +1,5 @@
 import cn.org.rapid_framework.generator.GeneratorFacade;
-public class RunGenerator {
+public class Main {
     /**
      * luj
      *  基于开源rapid-generator项目做了如下修改：
@@ -12,12 +12,12 @@ public class RunGenerator {
      *  修改src\generator.xml文件 配置数据库连接参数，表前缀参数  映射类型参数
      *  如果需要修改Entity类代码格式，修改template\*\${className}.java文件 配置生成的Entity实体类代码格式
      */
-    public static void main(String[]args)throws Exception{
+    public static void main(String[] args) throws Exception{
+	// write your code here
         System.out.println("AAAAAAA");
         GeneratorFacade g = new GeneratorFacade();
-         g.deleteOutRootDir();
+        g.deleteOutRootDir();
         //删除生成器的输出目录//
         g.generateByAllTable("template");
     }
-
 }

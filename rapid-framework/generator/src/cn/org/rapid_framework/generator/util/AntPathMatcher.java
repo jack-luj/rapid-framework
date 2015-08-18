@@ -354,7 +354,7 @@ public class AntPathMatcher  {
 	 * Given a full path, returns a {@link Comparator} suitable for sorting patterns in order of explicitness.
 	 *
 	 * <p>The returned <code>Comparator</code> will {@linkplain java.util.Collections#sort(java.util.List,
-	 * java.util.Comparator) sort} a list so that more specific patterns (without uri templates or wild cards) come before
+	 * Comparator) sort} a list so that more specific patterns (without uri templates or wild cards) come before
 	 * generic patterns. So given a list with the following patterns: <ol> <li><code>/hotels/new</code></li>
 	 * <li><code>/hotels/{hotel}</code></li> <li><code>/hotels/*</code></li> </ol> the returned comparator will sort this
 	 * list so that the order will be as indicated.

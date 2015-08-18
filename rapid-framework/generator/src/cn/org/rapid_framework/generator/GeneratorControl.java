@@ -17,7 +17,6 @@ import javax.swing.JOptionPane;
 import org.xml.sax.InputSource;
 
 import cn.org.rapid_framework.generator.provider.db.DataSourceProvider;
-import cn.org.rapid_framework.generator.util.DBHelper;
 import cn.org.rapid_framework.generator.util.FileHelper;
 import cn.org.rapid_framework.generator.util.GLogger;
 import cn.org.rapid_framework.generator.util.IOHelper;
@@ -33,7 +32,7 @@ import freemarker.ext.dom.NodeModel;
  * 
  * <pre>
  * 使用方式:
- * 可以在freemarker或是velocity中直接控制模板的生成
+ * 可以在freemarker或是veloctiy中直接控制模板的生成
  * 
  * ${gg.generateFile('d:/g_temp.log','info_from_generator')}
  * ${gg.setIgnoreOutput(true)}
@@ -44,8 +43,8 @@ import freemarker.ext.dom.NodeModel;
  * @author badqiu
  *
  */
-public class GeneratorControl implements GeneratorConstants{
-	private boolean isOverride = Boolean.parseBoolean(GeneratorProperties.getProperty(GG_IS_OVERRIDE,"false")); 
+public class GeneratorControl {
+	private boolean isOverride = Boolean.parseBoolean(System.getProperty("gg.isOverride","true"));
 	private boolean isAppend = false; //no pass
 	private boolean ignoreOutput = false; 
 	private boolean isMergeIfExists = true; //no pass
@@ -304,12 +303,7 @@ public class GeneratorControl implements GeneratorConstants{
 	
 	public List<Map> queryForList(String sql,int limit) throws SQLException {
 		Connection conn = DataSourceProvider.getConnection();
-		try {
-			List<Map> result =  SqlExecutorHelper.queryForList(conn, sql, limit);
-			return result;
-		}finally {
-			DBHelper.close(conn);
-		}
+		return SqlExecutorHelper.queryForList(conn, sql, limit);
 	}
 	
 	boolean deleteGeneratedFile = false;

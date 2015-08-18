@@ -19,12 +19,7 @@ public class SqlExecutorHelper {
 		ps.setMaxRows(limit);
 		ps.setFetchDirection(ResultSet.FETCH_FORWARD);
 		ResultSet rs = ps.executeQuery();
-		try {
-			List result =  toListMap(limit, rs);
-			return result;
-		}finally {
-			DBHelper.close(rs);
-		}
+		return toListMap(limit, rs);
 	}
 
 	public static List<Map> toListMap(int limit, ResultSet rs) throws SQLException {

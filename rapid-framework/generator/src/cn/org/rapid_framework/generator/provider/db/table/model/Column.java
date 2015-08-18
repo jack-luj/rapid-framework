@@ -196,13 +196,6 @@ public class Column implements java.io.Serializable,Cloneable{
 		return _sqlName;
 	}
 
-	public void setSqlName(String v) {
-		if(StringHelper.isBlank(v)) throw new IllegalArgumentException("sqlName must be not blank");
-		if(!v.equalsIgnoreCase(_sqlName)) {
-			throw new IllegalArgumentException("cannot change property:sqlName value");
-		}
-		this._sqlName = v;
-	}
 	
 	/**
 	 * Gets the Pk attribute of the Column object
@@ -699,5 +692,7 @@ public class Column implements java.io.Serializable,Cloneable{
 		public String getEnumDesc() {
 			return enumDesc;
 		}
+
+
 	}
 }

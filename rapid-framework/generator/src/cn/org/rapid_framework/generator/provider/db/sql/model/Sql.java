@@ -1,22 +1,15 @@
 package cn.org.rapid_framework.generator.provider.db.sql.model;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-import cn.org.rapid_framework.generator.GeneratorConstants;
-import cn.org.rapid_framework.generator.GeneratorProperties;
 import cn.org.rapid_framework.generator.provider.db.sql.SqlFactory;
-import cn.org.rapid_framework.generator.provider.db.table.TableFactory;
 import cn.org.rapid_framework.generator.provider.db.table.model.Column;
-import cn.org.rapid_framework.generator.provider.db.table.model.ColumnSet;
 import cn.org.rapid_framework.generator.provider.db.table.model.Table;
 import cn.org.rapid_framework.generator.util.StringHelper;
 import cn.org.rapid_framework.generator.util.sqlparse.SqlParseHelper;
 import cn.org.rapid_framework.generator.util.sqlparse.SqlTypeChecker;
-import cn.org.rapid_framework.generator.util.sqlparse.SqlParseHelper.NameWithAlias;
 
 /**
  * 用于生成代码的Sql对象.对应数据库的sql语句
@@ -42,6 +35,7 @@ public class Sql {
 	public static String MULTIPLICITY_MANY = "many";
 	public static String MULTIPLICITY_PAGING = "paging";
 	
+	String                      tableSqlName        = null;                             // 是否需要
 	String operation = null;
 	String resultClass;
 	String parameterClass;
@@ -61,41 +55,42 @@ public class Sql {
 	public Sql() {
 	}
 	
-	/** 判断select查询回来的列是否是同一张表的字段 */
+	public Sql(Sql sql) {
+        this.tableSqlName = sql.tableSqlName;
+
+        this.operation = sql.operation;
+        this.parameterClass = sql.parameterClass;
+        this.resultClass = sql.resultClass;
+        this.multiplicity = sql.multiplicity;
+
+        this.columns = sql.columns;
+        this.params = sql.params;
+        this.sourceSql = sql.sourceSql;
+        this.executeSql = sql.executeSql;
+        this.remarks = sql.remarks;
+    }
+	
 	public boolean isColumnsInSameTable() {
 		// FIXME 还要增加表的列数与columns是否相等,才可以为select 生成 include语句
 		if(columns == null || columns.isEmpty()) return false;
-		
-		Collection<NameWithAlias> tableNames = SqlParseHelper.getTableNamesByQuery(executeSql);
-		if(tableNames.size() > 1) {
-		    return false;
+		Column firstTable = columns.iterator().next();
+		if(columns.size() == 1) return true;
+		if(firstTable.getTable() == null) {
+			return false;
 		}
-        Table t = TableFactory.getInstance().getTable(tableNames.iterator().next().getName());
-        for(Column c : columns) {
-            Column fromTableColumn = new ColumnSet(t.getColumns()).getBySqlName(c.getSqlName());
-            if(fromTableColumn == null) {
-                return false;
-            }
-        }
-        
-//		Column firstTable = columns.iterator().next();
-//		if(columns.size() == 1) return true;
-//		if(firstTable.getTable() == null) {
-//			return false;
-//		}
-//		
-//		String preTableName = firstTable.getTable().getSqlName();
-//		for(Column c :columns) {
-//			Table table = c.getTable();
-//			if(table == null) {
-//				return false;
-//			}
-//			if(preTableName.equalsIgnoreCase(table.getSqlName())) {
-//				continue;
-//			}else {
-//			    return false;
-//			}
-//		}
+		
+		String preTableName = firstTable.getTable().getSqlName();
+		for(Column c :columns) {
+			Table table = c.getTable();
+			if(table == null) {
+				return false;
+			}
+			if(preTableName.equalsIgnoreCase(table.getSqlName())) {
+				continue;
+			}else {
+			    return false;
+			}
+		}
 		return true;
 	}
 
@@ -116,12 +111,10 @@ public class Sql {
 			return columns.iterator().next().getSimpleJavaType();
 		}
 		if(isColumnsInSameTable()) {
-		    Collection<NameWithAlias> tableNames = SqlParseHelper.getTableNamesByQuery(executeSql);
-		    Table t = TableFactory.getInstance().getTable(tableNames.iterator().next().getName());
-		    return t.getClassName();
+			return columns.iterator().next().getTable().getClassName();
 		}else {
 			if(operation == null) return null;
-			return StringHelper.makeAllWordFirstLetterUpperCase(StringHelper.toUnderscoreName(operation))+GeneratorProperties.getProperty(GeneratorConstants.GENERATOR_SQL_RESULTCLASS_SUFFIX,"Result");
+			return StringHelper.makeAllWordFirstLetterUpperCase(StringHelper.toUnderscoreName(operation))+System.getProperty("generator.sql.resultClass.suffix","Result");
 		}
 	}    
 	
@@ -258,9 +251,9 @@ public class Sql {
 	}
 	
 	public String getSqlmap() {
-		return getSqlmap(getParamNames());
+		return sqlmap;
 	}
-	
+
 	public void setSqlmap(String sqlmap) {
 	    if(StringHelper.isNotBlank(sqlmap)) {
 	        sqlmap = StringHelper.replace(sqlmap, "${cdata-start}", "<![CDATA[");
@@ -268,16 +261,8 @@ public class Sql {
 	    }
 	    this.sqlmap = sqlmap;
 	}
-
-    private List<String> getParamNames() {
-        List<String> paramNames = new ArrayList<String>();
-        for(SqlParameter p : params) {
-            paramNames.add(p.getParamName());
-        }
-        return paramNames;
-    }
-	   
-    private String getSqlmap(List<String> params) {
+	
+    public String getSqlmap(List<String> params) {
         if (params == null || params.size() == 0) {
             return sqlmap;
         }
@@ -285,7 +270,6 @@ public class Sql {
         String result = sqlmap;
 
         if (params.size() == 1) {
-        	//FIXME: 与dalgen相比,修正是否将 ${param1} 的替换值是: value
             return StringHelper.replace(result, "${param1}", "value");
         } else {
             for (int i = 0; i < params.size(); i++) {
@@ -354,9 +338,9 @@ public class Sql {
 		return replaceWildcardWithColumnsSqlName(sourceSql);
 	}
 	
-	public static String toCountSqlForPaging(String sql) {
+	public String toCountSqlForPaging(String sql) {
 	    if(sql == null) return null;
-	    if(SqlTypeChecker.isSelectSql(sql)) {
+	    if(isSelectSql()) {
             return SqlParseHelper.toCountSqlForPaging(sql, "select count(*) ");
 	    }
 	    return sql;
@@ -438,6 +422,18 @@ public class Sql {
 	}
 
     /**
+     * 得到表相对应的sqlName,主要用途为生成文件时的分组.
+     * @return
+     */
+	public String getTableSqlName() {
+		return tableSqlName;
+	}
+
+	public void setTableSqlName(String tableName) {
+		this.tableSqlName = tableName;
+	}
+
+    /**
      * 得到备注
      * @return
      */
@@ -467,6 +463,16 @@ public class Sql {
     public void setPaging(boolean paging) {
         this.paging = paging;
     }
+
+    /**
+     * 根据tableSqlName和成相对应的tableClassName,主要用途路径变量引用.如${tableClassName}Dao.java
+     * @return
+     */
+	public String getTableClassName() {
+		if(StringHelper.isBlank(tableSqlName)) return null;
+		String removedPrefixSqlName = Table.removeTableSqlNamePrefix(tableSqlName);
+		return StringHelper.makeAllWordFirstLetterUpperCase(StringHelper.toUnderscoreName(removedPrefixSqlName));
+	}
 
 	public Column getColumnBySqlName(String sqlName) {
 		for(Column c : getColumns()) {

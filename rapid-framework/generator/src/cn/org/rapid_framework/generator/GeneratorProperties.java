@@ -47,6 +47,7 @@ public class GeneratorProperties {
 	}
 
 	private static void setSepicalProperties(Properties p, String[] loadedFiles) {
+		p.put("databaseType", getDatabaseType(p,"databaseType"));
 		if(loadedFiles != null && loadedFiles.length > 0) {
 			String basedir = p.getProperty("basedir");
 			if(basedir != null && basedir.startsWith(".")) {
@@ -54,17 +55,10 @@ public class GeneratorProperties {
 			}
 		}
 	}
-
-	public static String getDatabaseType(String key) {
-		return getDatabaseType(getProperties(),key);
-	}
 	
-	public static String getDatabaseType(Map p,String key) {
-		if(p.containsKey(key)) {
-			return (String)p.get(key);
-		}
-		String databaseType = DatabaseTypeUtils.getDatabaseTypeByJdbcDriver((String)p.get(GeneratorConstants.JDBC_DRIVER));
-		return databaseType;
+	private static String getDatabaseType(Properties p,String key) {
+		String databaseType = DatabaseTypeUtils.getDatabaseTypeByJdbcDriver(p.getProperty("jdbc.driver"));
+		return p.getProperty(key,databaseType == null ? "" : databaseType);
 	}
 	
 	// 自动替换所有value从 com.company 替换为 com/company,并设置key = key+"_dir"后缀
@@ -114,35 +108,16 @@ public class GeneratorProperties {
 		return getHelper().getNullIfBlank(key);
 	}
 	
-	public static String[] getStringArray(String key) {
-		return getHelper().getStringArray(key);
-	}
-	
-	public static int[] getIntArray(String key) {
-		return getHelper().getIntArray(key);
-	}
-	
-	public static boolean getBoolean(String key,boolean defaultValue) {
-	    return getHelper().getBoolean(key, defaultValue);
-	}
-	
 	public static void setProperty(String key,String value) {
-//	    assertPropertyKey(key);
 		value = resolveProperty(value,getProperties());
 		key = resolveProperty(key,getProperties());
-	    GLogger.debug("[setProperty()] "+key+"="+value);
+	    GLogger.println("[setProperty()] "+key+"="+value);
 		getHelper().setProperty(key, value);
 		String dir_value = value.toString().replace('.', '/');
 		getHelper().getProperties().put(key+"_dir", dir_value);
 	}
 
-	private static void assertPropertyKey(String key) {
-	    if(key.indexOf(".") >= 0) {
-	        throw new IllegalArgumentException("property的key不能包含句号'.'，使用下划线'_'代替. key="+key);
-	    }
-    }
-
-    private static Properties resolveProperties(Properties props) {
+	private static Properties resolveProperties(Properties props) {
 		Properties result = new Properties();
 		for(Object s : props.keySet()) {
 			String sourceKey = s.toString();
@@ -162,8 +137,7 @@ public class GeneratorProperties {
 		props = new PropertiesHelper(resolveProperties(inputProps),true);
         for(Iterator it = props.entrySet().iterator();it.hasNext();) {
             Map.Entry entry = (Map.Entry)it.next();
-//            assertPropertyKey(entry.getKey().toString());
-            GLogger.debug("[Property] "+entry.getKey()+"="+entry.getValue());
+            GLogger.println("[Property] "+entry.getKey()+"="+entry.getValue());
         }
         GLogger.println("");
         

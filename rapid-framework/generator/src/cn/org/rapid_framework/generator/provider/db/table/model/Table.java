@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-import cn.org.rapid_framework.generator.GeneratorConstants;
 import cn.org.rapid_framework.generator.GeneratorProperties;
 import cn.org.rapid_framework.generator.provider.db.table.TableFactory;
 import cn.org.rapid_framework.generator.util.StringHelper;
@@ -27,7 +26,7 @@ public class Table implements java.io.Serializable,Cloneable {
 	/** real table name for oracle SYNONYM */
 	private String tableSynonymName = null; 
 	
-	ColumnSet columns = new ColumnSet();
+	LinkedHashSet<Column> columns = new LinkedHashSet<Column>();
 	List<Column> primaryKeyColumns = new ArrayList<Column>();
 	
 	
@@ -38,7 +37,7 @@ public class Table implements java.io.Serializable,Cloneable {
 		this.remarks = t.getRemarks();
 		this.className = t.getClassName();
 		this.ownerSynonymName = t.getOwnerSynonymName();
-		setColumns(t.getColumns());
+		this.columns = t.getColumns();
 		this.primaryKeyColumns = t.getPrimaryKeyColumns();
 		this.tableAlias = t.getTableAlias();
 		this.exportedKeys = t.exportedKeys;
@@ -46,10 +45,10 @@ public class Table implements java.io.Serializable,Cloneable {
 	}
 	
 	public LinkedHashSet<Column> getColumns() {
-		return columns.getColumns();
+		return columns;
 	}
 	public void setColumns(LinkedHashSet<Column> columns) {
-		this.columns.setColumns(columns);
+		this.columns = columns;
 	}
 	public String getOwnerSynonymName() {
 		return ownerSynonymName;
@@ -83,8 +82,8 @@ public class Table implements java.io.Serializable,Cloneable {
 	}
 
 	public static String removeTableSqlNamePrefix(String sqlName) {
-		String[] prefixs = GeneratorProperties.getStringArray(GeneratorConstants.TABLE_REMOVE_PREFIXES);
-		for(String prefix : prefixs) {
+		String prefixs = GeneratorProperties.getProperty("tableRemovePrefixes", "");
+		for(String prefix : prefixs.split(",")) {
 			String removedPrefixSqlName = StringHelper.removePrefix(sqlName, prefix,true);
 			if(!removedPrefixSqlName.equals(sqlName)) {
 				return removedPrefixSqlName;
@@ -92,7 +91,7 @@ public class Table implements java.io.Serializable,Cloneable {
 		}
 		return sqlName;
 	}
-	
+
 	/** 数据库中表的表备注 */
 	public String getRemarks() {
 		return remarks;
@@ -101,7 +100,7 @@ public class Table implements java.io.Serializable,Cloneable {
 		this.remarks = remarks;
 	}
 	public void addColumn(Column column) {
-		columns.addColumn(column);
+		columns.add(column);
 	}
 	
 	public void setClassName(String customClassName) {
@@ -181,7 +180,13 @@ public class Table implements java.io.Serializable,Cloneable {
 	 * @return
 	 */
 	public int getPkCount() {
-		return columns.getPkCount();
+		int pkCount = 0;
+		for(Column c : columns){
+			if(c.isPk()) {
+				pkCount ++;
+			}
+		}
+		return pkCount;
 	}
 	/**
 	 * use getPkColumns()
@@ -196,7 +201,12 @@ public class Table implements java.io.Serializable,Cloneable {
 	 * @return
 	 */	
 	public List<Column> getPkColumns() {
-		return columns.getPkColumns();
+		List results = new ArrayList();
+		for(Column c : getColumns()) {
+			if(c.isPk())
+				results.add(c);
+		}
+		return results;
 	}
 	
 	/**
@@ -204,16 +214,19 @@ public class Table implements java.io.Serializable,Cloneable {
 	 * @return
 	 */
 	public List<Column> getNotPkColumns() {
-		return columns.getNotPkColumns();
+		List results = new ArrayList();
+		for(Column c : getColumns()) {
+			if(!c.isPk())
+				results.add(c);
+		}
+		return results;
 	}
-	
 	/** 得到单主键，等价于getPkColumns().get(0)  */
 	public Column getPkColumn() {
-		Column c = columns.getPkColumn();
-		if(c == null) {
+		if(getPkColumns().isEmpty()) {
 			throw new IllegalStateException("not found primary key on table:"+getSqlName());
 		}
-		return c;
+		return getPkColumns().get(0);
 	}
 	
 	/**使用 getPkColumn()替换 */
@@ -223,15 +236,29 @@ public class Table implements java.io.Serializable,Cloneable {
 	}
 	
 	public List<Column> getEnumColumns() {
-        return columns.getEnumColumns();   
+        List results = new ArrayList();
+        for(Column c : getColumns()) {
+            if(!c.isEnumColumn())
+                results.add(c);
+        }
+        return results;	    
 	}
 	
 	public Column getColumnByName(String name) {
-	    return columns.getByName(name);
+	    Column c = getColumnBySqlName(name);
+	    if(c == null) {
+	    	c = getColumnBySqlName(StringHelper.toUnderscoreName(name));
+	    }
+	    return c;
 	}
 	
 	public Column getColumnBySqlName(String sqlName) {
-	    return columns.getBySqlName(sqlName);
+	    for(Column c : getColumns()) {
+	        if(c.getSqlName().equalsIgnoreCase(sqlName)) {
+	            return c;
+	        }
+	    }
+	    return null;
 	}
 	
    public Column getRequiredColumnBySqlName(String sqlName) {
@@ -331,16 +358,8 @@ public class Table implements java.io.Serializable,Cloneable {
 		}
 	}
 	
-	public void setSchema(String schema) {
-		this.schema = schema;
-	}
-
-	public void setCatalog(String catalog) {
-		this.catalog = catalog;
-	}
-
-	String catalog = null;
-	String schema = null;
+	String catalog = TableFactory.getInstance().getCatalog();
+	String schema = TableFactory.getInstance().getSchema();
 	
 	private String tableAlias;
 	private ForeignKeys exportedKeys;
