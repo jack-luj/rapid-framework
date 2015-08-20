@@ -10,7 +10,7 @@ import javax.persistence.*;
 
 @Entity
 @Table(name = "${table.sqlName}")
-public class ${className}{
+public class ${className} implements Serializable{
 
 <@generateFields/>
 <@generateRelations/>
